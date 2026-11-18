@@ -39,6 +39,16 @@ The username must be 3-64 characters and use letters, numbers, `.`, `_`, or
 `-`. Passwords must be at least 12 characters. Avoid putting the password
 directly in shell commands or source-controlled files.
 
+## Authentication API
+
+- `POST /api/auth/login` accepts a JSON `username` and `password`, and sets an
+  HTTP-only, same-site session cookie on success.
+- `GET /api/auth/me` returns the authenticated administrator.
+- `POST /api/auth/logout` revokes the current session.
+
+Login failures are rate-limited. Sessions expire after 12 hours and are stored
+as hashes in SQLite. The cookie is marked `Secure` when `NODE_ENV=production`.
+
 ## Container
 
 Build and start the initial service with:

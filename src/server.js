@@ -1,5 +1,6 @@
 import express from "express";
 import { pathToFileURL } from "node:url";
+import { createAuthRouter } from "./auth/routes.js";
 import { createDatabase } from "./db/database.js";
 
 export function createApp({ database }) {
@@ -10,8 +11,21 @@ export function createApp({ database }) {
   const app = express();
 
   app.disable("x-powered-by");
+  app.use(express.json({ limit: "16kb" }));
   app.get("/health", (_request, response) => {
     response.json({ status: "ok" });
+  });
+  app.use("/api/auth", createAuthRouter(database.db));
+  app.use((error, _request, response, _next) => {
+    if (error?.type === "entity.parse.failed") {
+      return response.status(400).json({ error: "Invalid JSON body" });
+    }
+    if (error?.status === 413) {
+      return response.status(413).json({ error: "Request body is too large" });
+    }
+
+    console.error("Unhandled request error", error);
+    return response.status(500).json({ error: "Internal server error" });
   });
 
   return app;

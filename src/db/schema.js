@@ -6,3 +6,12 @@ export const adminUsers = sqliteTable("admin_users", {
   passwordHash: text("password_hash").notNull(),
   createdAt: integer("created_at").notNull(),
 });
+
+export const adminSessions = sqliteTable("admin_sessions", {
+  sessionHash: text("session_hash").primaryKey(),
+  adminUserId: integer("admin_user_id")
+    .notNull()
+    .references(() => adminUsers.id, { onDelete: "cascade" }),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+});
