@@ -3,6 +3,7 @@ node_modules/
 .env.*
 !.env.example
 coverage/
+data/
 npm-debug.log*
 *.sqlite
 *.sqlite-journal
