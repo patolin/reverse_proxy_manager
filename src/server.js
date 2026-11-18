@@ -2,8 +2,9 @@ import express from "express";
 import { pathToFileURL } from "node:url";
 import { createAuthRouter } from "./auth/routes.js";
 import { createDatabase } from "./db/database.js";
+import { createSitesRouter } from "./sites/routes.js";
 
-export function createApp({ database }) {
+export function createApp({ database, proxyDirectory }) {
   if (!database?.db) {
     throw new TypeError("A database connection is required");
   }
@@ -16,6 +17,7 @@ export function createApp({ database }) {
     response.json({ status: "ok" });
   });
   app.use("/api/auth", createAuthRouter(database.db));
+  app.use("/api/sites", createSitesRouter(database.db, proxyDirectory));
   app.use((error, _request, response, _next) => {
     if (error?.type === "entity.parse.failed") {
       return response.status(400).json({ error: "Invalid JSON body" });

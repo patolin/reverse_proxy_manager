@@ -5,10 +5,14 @@ services:
     environment:
       PORT: 3000
       DATABASE_PATH: /app/data/app.sqlite
+      TRAEFIK_DYNAMIC_DIRECTORY: /app/proxy-dynamic
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - manager_data:/app/data
+      - proxy_dynamic:/app/proxy-dynamic
+    networks:
+      - proxy
     healthcheck:
       test:
         - CMD
@@ -19,5 +23,40 @@ services:
       timeout: 3s
       retries: 3
 
+  traefik:
+    image: traefik:v3
+    restart: unless-stopped
+    command:
+      - --api.dashboard=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?Set ACME_EMAIL in .env}
+      - --certificatesresolvers.letsencrypt.acme.storage=/data/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - traefik_data:/data
+      - proxy_dynamic:/etc/traefik/dynamic:ro
+    networks:
+      - proxy
+
+  fallback:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./fallback:/usr/share/nginx/html:ro
+    networks:
+      - proxy
+
 volumes:
   manager_data:
+  proxy_dynamic:
+  traefik_data:
+
+networks:
+  proxy:
+    name: reverse-proxy-manager-proxy

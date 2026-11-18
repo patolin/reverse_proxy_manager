@@ -15,3 +15,14 @@ export const adminSessions = sqliteTable("admin_sessions", {
   createdAt: integer("created_at").notNull(),
   expiresAt: integer("expires_at").notNull(),
 });
+
+export const sites = sqliteTable("sites", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  host: text("host").notNull().unique(),
+  backendService: text("backend_service").notNull(),
+  backendPort: integer("backend_port").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});

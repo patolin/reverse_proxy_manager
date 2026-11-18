@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { after, before, test } from "node:test";
 import { createAdminUser } from "../src/auth/admin-users.js";
 import { adminSessions } from "../src/db/schema.js";
@@ -8,11 +11,13 @@ import { createApp } from "../src/server.js";
 let server;
 let baseUrl;
 let database;
+let proxyDirectory;
 
 before(async () => {
   database = createDatabase(":memory:");
   await createAdminUser(database.db, "test-admin", "a-long-test-password");
-  server = createApp({ database }).listen(0, "127.0.0.1");
+  proxyDirectory = mkdtempSync(join(tmpdir(), "reverse-proxy-manager-proxy-"));
+  server = createApp({ database, proxyDirectory }).listen(0, "127.0.0.1");
   await new Promise((resolve, reject) => {
     server.once("listening", resolve);
     server.once("error", reject);
@@ -25,6 +30,7 @@ after(async () => {
     server.close((error) => (error ? reject(error) : resolve()));
   });
   database.close();
+  rmSync(proxyDirectory, { recursive: true, force: true });
 });
 
 test("login creates a hashed, secure session that can be used and revoked", async () => {
