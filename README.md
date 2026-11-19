@@ -7,6 +7,7 @@ increment provides the service foundation and container health endpoint.
 
 - Node.js 20.19 or newer
 - npm
+- GNU Make (for the convenience commands below)
 - Docker and Docker Compose (for container use)
 
 ## Local development
@@ -122,11 +123,14 @@ ports 80 and 443 must be reachable from the internet for routing and
 certificate issuance. Set `ADMIN_HOST` to a domain for HTTPS access to the
 manager UI; leave it unset to use an SSH tunnel to the loopback-bound API port.
 
-Build and start the initial service with:
+Build and start the services in the background with:
 
 ```sh
-docker compose up --build
+make run
 ```
+
+Stop the containers with `make stop`; named volumes are preserved. Run the
+test suite with `make test`.
 
 Create an administrator in the Compose database by exporting `ADMIN_USERNAME`
 and `ADMIN_PASSWORD` through a private environment mechanism and running:
