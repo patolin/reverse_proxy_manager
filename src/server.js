@@ -4,11 +4,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createAuthRouter } from "./auth/routes.js";
 import { createDatabase } from "./db/database.js";
+import { createDeploymentQueue } from "./deployments/queue.js";
+import { createDeploymentRouter } from "./deployments/routes.js";
 import { createSitesRouter } from "./sites/routes.js";
 
-export function createApp({ database, proxyDirectory }) {
-  if (!database?.db) {
-    throw new TypeError("A database connection is required");
+export function createApp({ database, deploymentQueue, proxyDirectory }) {
+  if (!database?.db || !deploymentQueue) {
+    throw new TypeError("Database and deployment queue connections are required");
   }
 
   const app = express();
@@ -23,7 +25,8 @@ export function createApp({ database, proxyDirectory }) {
     response.json({ status: "ok" });
   });
   app.use("/api/auth", createAuthRouter(database.db));
-  app.use("/api/sites", createSitesRouter(database.db, proxyDirectory));
+  app.use("/api/sites", createSitesRouter(database.db, proxyDirectory, deploymentQueue));
+  app.use("/api", createDeploymentRouter(database.db, deploymentQueue));
   app.use("/api", (_request, response) => {
     response.status(404).json({ error: "API endpoint not found" });
   });
@@ -61,13 +64,18 @@ export function startServer() {
   }
 
   const database = createDatabase();
-  const app = createApp({ database });
+  const deploymentQueue = createDeploymentQueue();
+  const app = createApp({ database, deploymentQueue });
   const host = process.env.HOST ?? "127.0.0.1";
   const server = app.listen(port, host, () => {
     console.log(`Reverse proxy manager listening on port ${port}`);
   });
-  server.once("close", database.close);
-  server.once("error", database.close);
+  const closeConnections = () => {
+    database.close();
+    deploymentQueue.close();
+  };
+  server.once("close", closeConnections);
+  server.once("error", closeConnections);
   return server;
 }
 

@@ -83,6 +83,36 @@ Upstream 5xx errors are served a static fallback page. Application containers
 must join the proxy network, for example by declaring it as an external network
 in their Compose file.
 
+## GitHub Compose deployments
+
+From a site's **Deploy** action, an administrator can queue a deployment from a
+public GitHub repository, branch, and Compose YAML file. The Compose service
+named by the site's backend must join the external proxy network:
+
+```yaml
+services:
+  web:
+    build: .
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: reverse-proxy-manager-proxy
+```
+
+The manager API writes a job to a separate SQLite queue. A dedicated worker
+clones the repository and runs `docker compose up --detach --build
+--remove-orphans` with a site-specific project name. Job status is visible in
+the UI. Deployments are limited to public GitHub URLs; private repository
+credentials are not supported.
+
+The worker alone receives the Docker socket. Because a Compose file can request
+host mounts, privileged containers, or other powerful capabilities, deploy
+only code you trust. The web application itself does not receive Docker socket
+access.
+
 ## Container
 
 Copy `.env.example` to `.env` and replace its example values. Set `ACME_EMAIL`
@@ -109,4 +139,5 @@ The health endpoint is available at `http://localhost:3000/health`. When
 `ADMIN_HOST` is configured, the manager UI is routed through Traefik with
 HTTPS. Otherwise, use an SSH tunnel to access the loopback-bound API and UI.
 The SQLite database, Traefik certificates, and generated proxy routes are
-stored in named volumes.
+stored in named volumes. Deployment queue records and checked-out repositories
+use separate volumes.

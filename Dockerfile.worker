@@ -1,0 +1,13 @@
+FROM node:20-alpine
+
+RUN apk add --no-cache git docker-cli docker-cli-compose python3 make g++
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY src/deployments ./src/deployments
+COPY deployment-worker/worker.js ./deployment-worker/worker.js
+RUN mkdir -p /queue /deployments
+
+CMD ["node", "deployment-worker/worker.js"]

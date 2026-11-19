@@ -143,7 +143,15 @@ function SiteDialog({ open, site, saving, error, onClose, onSave }) {
   );
 }
 
-function SiteCard({ site, busy, onEdit, onDelete, onToggle }) {
+function SiteCard({ site, deployment, busy, onEdit, onDelete, onToggle, onDeploy }) {
+  const deploymentActive = deployment?.status === "queued" || deployment?.status === "running";
+  const deploymentColor = {
+    queued: "default",
+    running: "info",
+    succeeded: "success",
+    failed: "error",
+  }[deployment?.status] ?? "default";
+
   return (
     <Card variant="outlined">
       <CardContent sx={{ pb: 1 }}>
@@ -173,13 +181,31 @@ function SiteCard({ site, busy, onEdit, onDelete, onToggle }) {
         <Typography sx={{ overflowWrap: "anywhere" }}>
           {site.backendService}:{site.backendPort}
         </Typography>
+        {deployment && (
+          <Box sx={{ mt: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Typography variant="body2" color="text.secondary">Latest deployment</Typography>
+              <Chip
+                size="small"
+                color={deploymentColor}
+                label={deployment.status}
+                variant={deployment.status === "queued" ? "outlined" : "filled"}
+              />
+            </Stack>
+            {deployment.error && (
+              <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+                {deployment.error}
+              </Typography>
+            )}
+          </Box>
+        )}
       </CardContent>
       <CardActions sx={{ px: 2, pb: 2, justifyContent: "space-between" }}>
         <FormControlLabel
           control={
             <Switch
               checked={site.enabled}
-              disabled={busy}
+              disabled={busy || deploymentActive}
               onChange={(event) => onToggle(site, event.target.checked)}
               inputProps={{ "aria-label": `Enable route for ${site.name}` }}
             />
@@ -187,15 +213,97 @@ function SiteCard({ site, busy, onEdit, onDelete, onToggle }) {
           label="Route"
         />
         <Stack direction="row" spacing={0.5}>
-          <IconButton aria-label={`Edit ${site.name}`} onClick={() => onEdit(site)} disabled={busy}>
+          <Button size="small" onClick={() => onDeploy(site)} disabled={busy || deploymentActive}>
+            Deploy
+          </Button>
+          <IconButton aria-label={`Edit ${site.name}`} onClick={() => onEdit(site)} disabled={busy || deploymentActive}>
             <EditOutlinedIcon />
           </IconButton>
-          <IconButton aria-label={`Delete ${site.name}`} onClick={() => onDelete(site)} disabled={busy}>
+          <IconButton aria-label={`Delete ${site.name}`} onClick={() => onDelete(site)} disabled={busy || deploymentActive}>
             <DeleteOutlineIcon />
           </IconButton>
         </Stack>
       </CardActions>
     </Card>
+  );
+}
+
+function DeploymentDialog({ open, site, previous, busy, error, onClose, onSubmit }) {
+  const [values, setValues] = useState({
+    repository: "",
+    branch: "main",
+    composeFile: "compose.yaml",
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    setValues({
+      repository: previous?.repository ?? "",
+      branch: previous?.branch ?? "main",
+      composeFile: previous?.composeFile ?? "compose.yaml",
+    });
+  }, [open, site?.id]);
+
+  function updateField(event) {
+    const { name, value } = event.target;
+    setValues((current) => ({ ...current, [name]: value }));
+  }
+
+  function submit(event) {
+    event.preventDefault();
+    onSubmit(values);
+  }
+
+  return (
+    <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="sm">
+      <Box component="form" onSubmit={submit}>
+        <DialogTitle>Deploy {site?.name} from GitHub</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2.25} sx={{ pt: 1 }}>
+            <Alert severity="warning">
+              Only deploy repositories you trust. Compose files can create containers with host-level access.
+            </Alert>
+            <Typography variant="body2" color="text.secondary">
+              The Compose backend service must be named <strong>{site?.backendService}</strong> and join the
+              external <code>reverse-proxy-manager-proxy</code> network.
+            </Typography>
+            {error && <Alert severity="error">{error}</Alert>}
+            <TextField
+              required
+              fullWidth
+              label="Public GitHub repository URL"
+              name="repository"
+              value={values.repository}
+              onChange={updateField}
+              placeholder="https://github.com/owner/repository"
+            />
+            <TextField
+              required
+              fullWidth
+              label="Branch"
+              name="branch"
+              value={values.branch}
+              onChange={updateField}
+            />
+            <TextField
+              required
+              fullWidth
+              label="Compose file"
+              name="composeFile"
+              value={values.composeFile}
+              onChange={updateField}
+              helperText="A relative .yml or .yaml path inside the repository."
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button type="submit" variant="contained" disabled={busy}>
+            {busy ? "Queueing…" : "Queue deployment"}
+          </Button>
+        </DialogActions>
+      </Box>
+    </Dialog>
   );
 }
 
@@ -268,9 +376,13 @@ export default function App() {
   const [sites, setSites] = useState([]);
   const [loadingSites, setLoadingSites] = useState(false);
   const [siteVersion, setSiteVersion] = useState(0);
+  const [deployments, setDeployments] = useState([]);
+  const [deploymentVersion, setDeploymentVersion] = useState(0);
   const [editingSite, setEditingSite] = useState(null);
   const [siteDialogOpen, setSiteDialogOpen] = useState(false);
   const [savingSite, setSavingSite] = useState(false);
+  const [deployingSite, setDeployingSite] = useState(null);
+  const [queueingDeployment, setQueueingDeployment] = useState(false);
   const [busySiteId, setBusySiteId] = useState(null);
   const [deletingSite, setDeletingSite] = useState(null);
   const [error, setError] = useState("");
@@ -323,6 +435,40 @@ export default function App() {
       active = false;
     };
   }, [user, siteVersion]);
+
+  useEffect(() => {
+    if (!user) {
+      setDeployments([]);
+      return undefined;
+    }
+
+    let active = true;
+    let timer;
+    async function refreshDeployments() {
+      try {
+        const result = await apiRequest("/api/deployments");
+        if (!active) return;
+        setDeployments(result.deployments);
+        if (result.deployments.some(({ status }) => status === "queued" || status === "running")) {
+          timer = setTimeout(refreshDeployments, 3000);
+        }
+      } catch (requestError) {
+        if (!active) return;
+        if (requestError instanceof ApiError && requestError.status === 401) {
+          setUser(null);
+          setError("Your session expired. Sign in again.");
+          return;
+        }
+        setError(requestError.message);
+      }
+    }
+
+    refreshDeployments();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [user, deploymentVersion]);
 
   function handleRequestError(requestError) {
     if (requestError instanceof ApiError && requestError.status === 401) {
@@ -413,6 +559,24 @@ export default function App() {
     }
   }
 
+  async function queueDeployment(values) {
+    if (!deployingSite) return;
+    setQueueingDeployment(true);
+    setError("");
+    try {
+      await apiRequest(`/api/sites/${deployingSite.id}/deployments`, {
+        method: "POST",
+        body: values,
+      });
+      setDeployingSite(null);
+      setDeploymentVersion((version) => version + 1);
+    } catch (requestError) {
+      handleRequestError(requestError);
+    } finally {
+      setQueueingDeployment(false);
+    }
+  }
+
   function openCreateDialog() {
     setError("");
     setEditingSite(null);
@@ -423,6 +587,18 @@ export default function App() {
     setError("");
     setEditingSite(site);
     setSiteDialogOpen(true);
+  }
+
+  function openDeploymentDialog(site) {
+    setError("");
+    setDeployingSite(site);
+  }
+
+  const latestDeploymentBySite = new Map();
+  for (const deployment of deployments) {
+    if (!latestDeploymentBySite.has(deployment.siteId)) {
+      latestDeploymentBySite.set(deployment.siteId, deployment);
+    }
   }
 
   if (checkingAuth) {
@@ -495,6 +671,7 @@ export default function App() {
                     <SiteCard
                       key={site.id}
                       site={site}
+                      deployment={latestDeploymentBySite.get(site.id)}
                       busy={busySiteId === site.id}
                       onEdit={openEditDialog}
                       onDelete={(selectedSite) => {
@@ -502,6 +679,7 @@ export default function App() {
                         setDeletingSite(selectedSite);
                       }}
                       onToggle={toggleSite}
+                      onDeploy={openDeploymentDialog}
                     />
                   ))}
                 </Box>
@@ -524,6 +702,19 @@ export default function App() {
           setError("");
         }}
         onSave={saveSite}
+      />
+
+      <DeploymentDialog
+        open={Boolean(deployingSite)}
+        site={deployingSite}
+        previous={deployingSite ? latestDeploymentBySite.get(deployingSite.id) : undefined}
+        busy={queueingDeployment}
+        error={error}
+        onClose={() => {
+          setDeployingSite(null);
+          setError("");
+        }}
+        onSubmit={queueDeployment}
       />
 
       <Dialog

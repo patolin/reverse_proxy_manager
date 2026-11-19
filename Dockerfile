@@ -15,7 +15,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-RUN mkdir -p /app/data /app/proxy-dynamic && chown -R node:node /app/data /app/proxy-dynamic
+RUN mkdir -p /app/data /app/proxy-dynamic /app/deployment-queue && chown -R node:node /app/data /app/proxy-dynamic /app/deployment-queue
 COPY --chown=node:node migrations ./migrations
 COPY --chown=node:node src ./src
 COPY --from=build --chown=node:node /app/dist ./dist

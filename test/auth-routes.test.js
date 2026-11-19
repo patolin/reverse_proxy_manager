@@ -6,18 +6,21 @@ import { after, before, test } from "node:test";
 import { createAdminUser } from "../src/auth/admin-users.js";
 import { adminSessions } from "../src/db/schema.js";
 import { createDatabase } from "../src/db/database.js";
+import { createDeploymentQueue } from "../src/deployments/queue.js";
 import { createApp } from "../src/server.js";
 
 let server;
 let baseUrl;
 let database;
+let deploymentQueue;
 let proxyDirectory;
 
 before(async () => {
   database = createDatabase(":memory:");
+  deploymentQueue = createDeploymentQueue(":memory:");
   await createAdminUser(database.db, "test-admin", "a-long-test-password");
   proxyDirectory = mkdtempSync(join(tmpdir(), "reverse-proxy-manager-proxy-"));
-  server = createApp({ database, proxyDirectory }).listen(0, "127.0.0.1");
+  server = createApp({ database, deploymentQueue, proxyDirectory }).listen(0, "127.0.0.1");
   await new Promise((resolve, reject) => {
     server.once("listening", resolve);
     server.once("error", reject);
@@ -30,6 +33,7 @@ after(async () => {
     server.close((error) => (error ? reject(error) : resolve()));
   });
   database.close();
+  deploymentQueue.close();
   rmSync(proxyDirectory, { recursive: true, force: true });
 });
 

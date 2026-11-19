@@ -13,7 +13,7 @@ function readSites(database) {
   return database.select().from(sites).orderBy(asc(sites.id)).all();
 }
 
-export function createSitesRouter(database, proxyDirectory) {
+export function createSitesRouter(database, proxyDirectory, deploymentQueue) {
   const router = Router();
 
   router.use((request, response, next) => {
@@ -63,6 +63,13 @@ export function createSitesRouter(database, proxyDirectory) {
     if (!Number.isSafeInteger(id) || id < 1) {
       return response.status(400).json({ error: "Site ID must be a positive integer" });
     }
+    if (
+      deploymentQueue
+        .listForSite(id, 1)
+        .some(({ status }) => status === "queued" || status === "running")
+    ) {
+      return response.status(409).json({ error: "Wait for the active deployment before editing this site" });
+    }
 
     let input;
     try {
@@ -102,6 +109,13 @@ export function createSitesRouter(database, proxyDirectory) {
     const id = Number(request.params.id);
     if (!Number.isSafeInteger(id) || id < 1) {
       return response.status(400).json({ error: "Site ID must be a positive integer" });
+    }
+
+    const activeDeployment = deploymentQueue
+      .listForSite(id, 1)
+      .some(({ status }) => status === "queued" || status === "running");
+    if (activeDeployment) {
+      return response.status(409).json({ error: "Wait for the active deployment before deleting this site" });
     }
 
     const deleted = database.transaction((transaction) => {

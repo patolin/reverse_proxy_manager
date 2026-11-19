@@ -7,11 +7,13 @@ services:
       HOST: 0.0.0.0
       DATABASE_PATH: /app/data/app.sqlite
       TRAEFIK_DYNAMIC_DIRECTORY: /app/proxy-dynamic
+      DEPLOYMENT_QUEUE_PATH: /app/deployment-queue/jobs.sqlite
       ADMIN_HOST: ${ADMIN_HOST:-}
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
       - manager_data:/app/data
+      - deployment_queue:/app/deployment-queue
       - proxy_dynamic:/app/proxy-dynamic
     networks:
       - proxy
@@ -24,6 +26,23 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
+
+  deploy-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    environment:
+      DEPLOYMENT_QUEUE_PATH: /queue/jobs.sqlite
+      DEPLOYMENT_ROOT: /deployments
+      PROXY_NETWORK_NAME: reverse-proxy-manager-proxy
+    volumes:
+      - deployment_queue:/queue
+      - deployment_files:/deployments
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      app:
+        condition: service_healthy
 
   traefik:
     image: traefik:v3
@@ -56,6 +75,8 @@ services:
 
 volumes:
   manager_data:
+  deployment_queue:
+  deployment_files:
   proxy_dynamic:
   traefik_data:
 

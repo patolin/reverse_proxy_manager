@@ -15,6 +15,9 @@ deployment workflow and operational hardening.
   assuming it.
 - Use Traefik's file provider for generated routes. Write configuration
   atomically, persist ACME data, and do not give the manager a Docker socket.
+- Limit the initial deployment workflow to public GitHub repositories with a
+  Compose file. Only the dedicated worker receives the Docker socket; the
+  administrator must deploy code they trust.
 - Route public traffic on standard ports 80/443. Domain names use HTTPS and
   Let's Encrypt; IP-address routes use HTTP. Public DNS and inbound firewall
   access are deployment prerequisites.
@@ -60,11 +63,11 @@ deployment workflow and operational hardening.
    - Add an explicit static fallback for unhealthy or unavailable backends.
    - Verify successful certificate issuance prerequisites and fallback behavior.
 6. **Implement constrained GitHub deployments**
-   - Add repository checkout, build, and start workflows using validated inputs
-     and fixed, allowlisted operations.
+   - Maintain the public-GitHub Compose worker and its validated queue inputs.
    - Require an administrator to trigger deployments and show progress and
      actionable errors.
-   - Protect credentials and avoid exposing deployment secrets in logs.
+   - Keep Docker socket access in the worker and avoid exposing secrets or
+     command output in logs.
 7. **Build the Material Design UI**
    - Maintain login and site management screens; add deployment controls and
      deployment status/error views as the deployment feature is implemented.
