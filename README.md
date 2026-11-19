@@ -1,7 +1,8 @@
 # Reverse Proxy Manager
 
-A Node.js application for managing sites and deployments on a VPS. The current
-increment provides the service foundation and container health endpoint.
+A Node.js application for managing public site routes and Compose deployments
+on a VPS. Administrators use the web dashboard to configure routes, manage
+their backends, and deploy from public GitHub repositories.
 
 ## Requirements
 
@@ -34,6 +35,9 @@ Run the test suite with:
 npm test
 ```
 
+The automated tests cover administrator setup and authentication, site
+validation and route generation, and GitHub deployment queue/worker behavior.
+
 Build the production web assets with:
 
 ```sh
@@ -63,6 +67,53 @@ npm run admin:create
 The username must be 3-64 characters and use letters, numbers, `.`, `_`, or
 `-`. Passwords must be at least 12 characters. Avoid putting the password
 directly in shell commands or source-controlled files.
+
+## Use the web dashboard
+
+Start the application using [Local development](#local-development) or
+[Container](#container), then open the manager URL and sign in with the
+administrator account created above.
+
+![Administrator sign-in screen](docs/images/sign-in.png)
+
+### Add and manage a site
+
+1. Select **Add site**.
+2. Enter a name, the public domain or IP address, the backend's Docker Compose
+   service name, and the port the application listens on inside its container.
+3. Select **Create site**. New sites are enabled by default and their route is
+   published immediately.
+
+The backend service must be reachable on the `reverse-proxy-manager-proxy`
+Docker network. Domain routes use HTTPS with Let's Encrypt; IP-address routes
+use HTTP only. For domain routes, point public DNS at the VPS and allow inbound
+ports 80 and 443.
+
+Each site card shows its public host, backend, and whether its route is enabled.
+Use the **Route** switch to enable or disable routing, the edit button to change
+the site settings, and the delete button to remove the site and its route.
+Deleting a site cannot be undone. While a deployment is queued or running, the
+site's route and edit/delete/deploy controls are unavailable. Select **Sign
+out** in the header to end the administrator session.
+
+### Deploy from GitHub
+
+Select **Deploy** on a site card, then provide a public GitHub repository URL,
+branch, and path to a `.yml` or `.yaml` Compose file in that repository. The
+defaults are `main` and `compose.yaml`. The Compose service name must exactly
+match the site's backend service name and join the external proxy network
+described in [GitHub Compose deployments](#github-compose-deployments).
+
+Select **Queue deployment** to start the job. The site's latest deployment
+status appears on its card (`queued`, `running`, `succeeded`, or `failed`); a
+failure message is shown there when available. Only one deployment per site
+can be active at a time.
+
+![GitHub deployment form with repository, branch, and Compose file fields](docs/images/deployment-dialog.png)
+
+Deploy only repositories you trust: Compose files can request host mounts,
+privileged containers, and other powerful capabilities. Private GitHub
+repositories are not supported.
 
 ## Authentication API
 
