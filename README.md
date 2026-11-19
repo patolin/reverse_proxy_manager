@@ -40,6 +40,10 @@ Build the production web assets with:
 npm run build
 ```
 
+The frontend currently ships in English. Edit the [English message catalog](./client/src/messages.js)
+to change UI wording, and keep named placeholders intact when translating
+messages. Messages returned by the server are outside the frontend catalog.
+
 ## Create the initial administrator
 
 Set `DATABASE_PATH` if the database should not use the default

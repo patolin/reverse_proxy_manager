@@ -30,6 +30,7 @@ import {
   Typography,
 } from "@mui/material";
 import { ApiError, apiRequest, getCurrentUser } from "./api.js";
+import { formatMessage, messageParts, messages } from "./messages.js";
 
 const emptySite = {
   name: "",
@@ -75,7 +76,7 @@ function SiteDialog({ open, site, saving, error, onClose, onSave }) {
   return (
     <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
       <Box component="form" onSubmit={submit}>
-        <DialogTitle>{site ? "Edit site" : "Add a site"}</DialogTitle>
+        <DialogTitle>{site ? messages.editSite : messages.addSiteDialog}</DialogTitle>
         <DialogContent>
           <Stack spacing={2.25} sx={{ pt: 1 }}>
             {error && <Alert severity="error">{error}</Alert>}
@@ -83,7 +84,7 @@ function SiteDialog({ open, site, saving, error, onClose, onSave }) {
               autoFocus
               required
               fullWidth
-              label="Site name"
+              label={messages.siteName}
               name="name"
               value={values.name}
               onChange={updateField}
@@ -92,26 +93,26 @@ function SiteDialog({ open, site, saving, error, onClose, onSave }) {
             <TextField
               required
               fullWidth
-              label="Public domain or IP address"
+              label={messages.publicHost}
               name="host"
               value={values.host}
               onChange={updateField}
-              helperText="Domains use HTTPS and Let's Encrypt; IP addresses use HTTP."
+              helperText={messages.publicHostHelp}
             />
             <TextField
               required
               fullWidth
-              label="Container service name"
+              label={messages.containerService}
               name="backendService"
               value={values.backendService}
               onChange={updateField}
-              helperText="The application container must join the proxy network."
+              helperText={messages.containerServiceHelp}
             />
             <TextField
               required
               fullWidth
               type="number"
-              label="Internal application port"
+              label={messages.internalPort}
               name="backendPort"
               value={values.backendPort}
               onChange={updateField}
@@ -127,15 +128,15 @@ function SiteDialog({ open, site, saving, error, onClose, onSave }) {
                     }
                   />
                 }
-                label="Route enabled"
+                label={messages.routeEnabled}
               />
             )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={onClose} disabled={saving}>{messages.cancel}</Button>
           <Button type="submit" variant="contained" disabled={saving}>
-            {saving ? "Saving…" : site ? "Save changes" : "Create site"}
+            {saving ? messages.saving : site ? messages.saveChanges : messages.createSite}
           </Button>
         </DialogActions>
       </Box>
@@ -170,13 +171,13 @@ function SiteCard({ site, deployment, busy, onEdit, onDelete, onToggle, onDeploy
           <Chip
             size="small"
             color={site.enabled ? "success" : "default"}
-            label={site.enabled ? "Enabled" : "Disabled"}
+            label={site.enabled ? messages.enabled : messages.disabled}
             variant={site.enabled ? "filled" : "outlined"}
           />
         </Stack>
         <Divider sx={{ my: 2 }} />
         <Typography variant="body2" color="text.secondary">
-          Backend
+          {messages.backend}
         </Typography>
         <Typography sx={{ overflowWrap: "anywhere" }}>
           {site.backendService}:{site.backendPort}
@@ -184,11 +185,13 @@ function SiteCard({ site, deployment, busy, onEdit, onDelete, onToggle, onDeploy
         {deployment && (
           <Box sx={{ mt: 2 }}>
             <Stack direction="row" alignItems="center" spacing={1}>
-              <Typography variant="body2" color="text.secondary">Latest deployment</Typography>
+              <Typography variant="body2" color="text.secondary">{messages.latestDeployment}</Typography>
               <Chip
                 size="small"
                 color={deploymentColor}
-                label={deployment.status}
+                label={Object.hasOwn(messages.deploymentStatuses, deployment.status)
+                  ? messages.deploymentStatuses[deployment.status]
+                  : deployment.status}
                 variant={deployment.status === "queued" ? "outlined" : "filled"}
               />
             </Stack>
@@ -207,19 +210,19 @@ function SiteCard({ site, deployment, busy, onEdit, onDelete, onToggle, onDeploy
               checked={site.enabled}
               disabled={busy || deploymentActive}
               onChange={(event) => onToggle(site, event.target.checked)}
-              inputProps={{ "aria-label": `Enable route for ${site.name}` }}
+              inputProps={{ "aria-label": formatMessage(messages.enableRouteFor, { name: site.name }) }}
             />
           }
-          label="Route"
+          label={messages.route}
         />
         <Stack direction="row" spacing={0.5}>
           <Button size="small" onClick={() => onDeploy(site)} disabled={busy || deploymentActive}>
-            Deploy
+            {messages.deploy}
           </Button>
-          <IconButton aria-label={`Edit ${site.name}`} onClick={() => onEdit(site)} disabled={busy || deploymentActive}>
+          <IconButton aria-label={formatMessage(messages.editNamed, { name: site.name })} onClick={() => onEdit(site)} disabled={busy || deploymentActive}>
             <EditOutlinedIcon />
           </IconButton>
-          <IconButton aria-label={`Delete ${site.name}`} onClick={() => onDelete(site)} disabled={busy || deploymentActive}>
+          <IconButton aria-label={formatMessage(messages.deleteNamed, { name: site.name })} onClick={() => onDelete(site)} disabled={busy || deploymentActive}>
             <DeleteOutlineIcon />
           </IconButton>
         </Stack>
@@ -257,30 +260,32 @@ function DeploymentDialog({ open, site, previous, busy, error, onClose, onSubmit
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="sm">
       <Box component="form" onSubmit={submit}>
-        <DialogTitle>Deploy {site?.name} from GitHub</DialogTitle>
+        <DialogTitle>{formatMessage(messages.deployFromGitHub, { name: site?.name })}</DialogTitle>
         <DialogContent>
           <Stack spacing={2.25} sx={{ pt: 1 }}>
             <Alert severity="warning">
-              Only deploy repositories you trust. Compose files can create containers with host-level access.
+              {messages.deploymentWarning}
             </Alert>
             <Typography variant="body2" color="text.secondary">
-              The Compose backend service must be named <strong>{site?.backendService}</strong> and join the
-              external <code>reverse-proxy-manager-proxy</code> network.
+              {messageParts(messages.deploymentNetworkHelp, {
+                service: <strong key="service">{site?.backendService}</strong>,
+                network: <code key="network">reverse-proxy-manager-proxy</code>,
+              })}
             </Typography>
             {error && <Alert severity="error">{error}</Alert>}
             <TextField
               required
               fullWidth
-              label="Public GitHub repository URL"
+              label={messages.repositoryUrl}
               name="repository"
               value={values.repository}
               onChange={updateField}
-              placeholder="https://github.com/owner/repository"
+              placeholder={messages.repositoryPlaceholder}
             />
             <TextField
               required
               fullWidth
-              label="Branch"
+              label={messages.branch}
               name="branch"
               value={values.branch}
               onChange={updateField}
@@ -288,18 +293,18 @@ function DeploymentDialog({ open, site, previous, busy, error, onClose, onSubmit
             <TextField
               required
               fullWidth
-              label="Compose file"
+              label={messages.composeFile}
               name="composeFile"
               value={values.composeFile}
               onChange={updateField}
-              helperText="A relative .yml or .yaml path inside the repository."
+              helperText={messages.composeFileHelp}
             />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={onClose} disabled={busy}>{messages.cancel}</Button>
           <Button type="submit" variant="contained" disabled={busy}>
-            {busy ? "Queueing…" : "Queue deployment"}
+            {busy ? messages.queueing : messages.queueDeployment}
           </Button>
         </DialogActions>
       </Box>
@@ -328,10 +333,10 @@ function LoginView({ loading, error, onSubmit }) {
       <Paper variant="outlined" sx={{ p: { xs: 3, sm: 5 } }}>
         <Stack spacing={3}>
           <Box>
-            <Typography variant="overline" color="primary">VPS CONTROL PANEL</Typography>
-            <Typography variant="h4" component="h1" sx={{ mt: 0.5 }}>Sign in</Typography>
+            <Typography variant="overline" color="primary">{messages.controlPanel}</Typography>
+            <Typography variant="h4" component="h1" sx={{ mt: 0.5 }}>{messages.signIn}</Typography>
             <Typography color="text.secondary" sx={{ mt: 1 }}>
-              Sign in with your administrator account to manage sites.
+              {messages.signInHelp}
             </Typography>
           </Box>
           {error && <Alert severity="error">{error}</Alert>}
@@ -341,7 +346,7 @@ function LoginView({ loading, error, onSubmit }) {
                 required
                 fullWidth
                 autoComplete="username"
-                label="Username"
+                label={messages.username}
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
               />
@@ -350,7 +355,7 @@ function LoginView({ loading, error, onSubmit }) {
                 fullWidth
                 type="password"
                 autoComplete="current-password"
-                label="Password"
+                label={messages.password}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
@@ -360,7 +365,7 @@ function LoginView({ loading, error, onSubmit }) {
                 size="large"
                 disabled={loading || submitting}
               >
-                {submitting ? "Signing in…" : "Sign in"}
+                {submitting ? messages.signingIn : messages.signIn}
               </Button>
             </Stack>
           </Box>
@@ -422,7 +427,7 @@ export default function App() {
         if (!active) return;
         if (requestError instanceof ApiError && requestError.status === 401) {
           setUser(null);
-          setError("Your session expired. Sign in again.");
+          setError(messages.sessionExpired);
           return;
         }
         setError(requestError.message);
@@ -456,7 +461,7 @@ export default function App() {
         if (!active) return;
         if (requestError instanceof ApiError && requestError.status === 401) {
           setUser(null);
-          setError("Your session expired. Sign in again.");
+          setError(messages.sessionExpired);
           return;
         }
         setError(requestError.message);
@@ -473,7 +478,7 @@ export default function App() {
   function handleRequestError(requestError) {
     if (requestError instanceof ApiError && requestError.status === 401) {
       setUser(null);
-      setError("Your session expired. Sign in again.");
+      setError(messages.sessionExpired);
       return;
     }
     setError(requestError.message);
@@ -604,7 +609,7 @@ export default function App() {
   if (checkingAuth) {
     return (
       <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
-        <CircularProgress aria-label="Checking administrator session" />
+        <CircularProgress aria-label={messages.checkingSession} />
       </Box>
     );
   }
@@ -617,12 +622,12 @@ export default function App() {
             <Toolbar>
               <Container maxWidth="lg" disableGutters sx={{ display: "flex", alignItems: "center" }}>
                 <Box sx={{ flexGrow: 1 }}>
-                  <Typography variant="h6" component="div">Proxy Manager</Typography>
+                  <Typography variant="h6" component="div">{messages.appName}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Signed in as {user.username}
+                    {formatMessage(messages.signedInAs, { username: user.username })}
                   </Typography>
                 </Box>
-                <Button startIcon={<LogoutIcon />} onClick={logout}>Sign out</Button>
+                <Button startIcon={<LogoutIcon />} onClick={logout}>{messages.signOut}</Button>
               </Container>
             </Toolbar>
           </AppBar>
@@ -635,28 +640,32 @@ export default function App() {
                 spacing={2}
               >
                 <Box>
-                  <Typography variant="h4" component="h1">Sites</Typography>
+                  <Typography variant="h4" component="h1">{messages.sites}</Typography>
                   <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                    Manage public routes to your application containers.
+                    {messages.sitesHelp}
                   </Typography>
                 </Box>
                 <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateDialog}>
-                  Add site
+                  {messages.addSite}
                 </Button>
               </Stack>
-              {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
+              {error && (
+                <Alert severity="error" closeText={messages.close} onClose={() => setError("")}>
+                  {error}
+                </Alert>
+              )}
               {loadingSites ? (
                 <Box sx={{ display: "grid", placeItems: "center", py: 8 }}>
-                  <CircularProgress aria-label="Loading sites" />
+                  <CircularProgress aria-label={messages.loadingSites} />
                 </Box>
               ) : sites.length === 0 ? (
                 <Paper variant="outlined" sx={{ p: { xs: 4, sm: 7 }, textAlign: "center" }}>
-                  <Typography variant="h6">No sites configured</Typography>
+                  <Typography variant="h6">{messages.noSites}</Typography>
                   <Typography color="text.secondary" sx={{ mt: 1, mb: 3 }}>
-                    Add a domain or IP address to route traffic to an application container.
+                    {messages.noSitesHelp}
                   </Typography>
                   <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateDialog}>
-                    Create your first site
+                    {messages.createFirstSite}
                   </Button>
                 </Paper>
               ) : (
@@ -724,11 +733,11 @@ export default function App() {
           setError("");
         }}
       >
-        <DialogTitle>Delete site?</DialogTitle>
+        <DialogTitle>{messages.deleteSiteTitle}</DialogTitle>
         <DialogContent>
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           <DialogContentText>
-            This will remove the route for {deletingSite?.host}. This action cannot be undone.
+            {formatMessage(messages.deleteSiteHelp, { host: deletingSite?.host })}
           </DialogContentText>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
@@ -739,10 +748,10 @@ export default function App() {
             }}
             disabled={busySiteId !== null}
           >
-            Cancel
+            {messages.cancel}
           </Button>
           <Button color="error" variant="contained" onClick={deleteSite} disabled={busySiteId !== null}>
-            Delete site
+            {messages.deleteSite}
           </Button>
         </DialogActions>
       </Dialog>

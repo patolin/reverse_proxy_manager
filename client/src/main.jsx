@@ -2,10 +2,13 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import App from "./App.jsx";
+import { messages } from "./messages.js";
+
+document.title = messages.title;
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
-  throw new Error("Application root element was not found");
+  throw new Error(messages.rootNotFound);
 }
 
 const theme = createTheme({

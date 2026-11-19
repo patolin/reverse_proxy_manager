@@ -1,3 +1,5 @@
+import { formatMessage, messages } from "./messages.js";
+
 export class ApiError extends Error {
   constructor(message, status) {
     super(message);
@@ -13,7 +15,7 @@ async function parseResponse(response) {
 
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
-    throw new Error("The server returned an unexpected response");
+    throw new Error(messages.unexpectedResponse);
   }
 
   return response.json();
@@ -34,7 +36,7 @@ export async function apiRequest(path, { body, ...options } = {}) {
   const payload = await parseResponse(response);
 
   if (!response.ok) {
-    throw new ApiError(payload?.error ?? `Request failed with status ${response.status}`, response.status);
+    throw new ApiError(payload?.error ?? formatMessage(messages.requestFailed, { status: response.status }), response.status);
   }
 
   return payload;

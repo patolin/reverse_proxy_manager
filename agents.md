@@ -107,6 +107,10 @@ Docker-operation boundary has been designed and tested.
   explain non-obvious decisions.
 - Keep dependency additions necessary and maintained; document security-relevant
   configuration and defaults.
+- Keep user-facing frontend copy in the English message catalog, including
+  accessibility labels and browser metadata. Use complete messages with named
+  placeholders for dynamic values so translations can reorder them. Keep
+  protocol values and server-provided errors separate from UI copy.
 
 ## Testing and quality practices
 
