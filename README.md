@@ -44,6 +44,12 @@ The frontend currently ships in English. Edit the [English message catalog](./cl
 to change UI wording, and keep named placeholders intact when translating
 messages. Messages returned by the server are outside the frontend catalog.
 
+The [app shell](./client/src/App.jsx) handles the session and switches between
+[sign-in](./client/src/features/auth/LoginView.jsx) and the
+[sites dashboard](./client/src/features/sites/SitesDashboard.jsx). The dashboard
+owns site and deployment requests; its list, cards, and dialogs receive data and
+callbacks through props.
+
 ## Create the initial administrator
 
 Set `DATABASE_PATH` if the database should not use the default
