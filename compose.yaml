@@ -59,6 +59,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    extra_hosts:
+      - "host-backend:host-gateway"
     volumes:
       - traefik_data:/data
       - proxy_dynamic:/etc/traefik/dynamic:ro
