@@ -36,4 +36,5 @@ test("health endpoint reports the service as healthy", async () => {
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: "ok" });
   assert.equal(response.headers.has("x-powered-by"), false);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
 });

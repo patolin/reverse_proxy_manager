@@ -5,7 +5,7 @@ increment provides the service foundation and container health endpoint.
 
 ## Requirements
 
-- Node.js 20 or newer
+- Node.js 20.19 or newer
 - npm
 - Docker and Docker Compose (for container use)
 
@@ -13,16 +13,30 @@ increment provides the service foundation and container health endpoint.
 
 ```sh
 npm install
-npm start
+npm run dev:api
 ```
 
-The service listens on port `3000` by default. Set `PORT` to use another valid
-port. `GET /health` returns `{"status":"ok"}` when the process is responding.
+In another terminal, start the web development server:
+
+```sh
+npm run dev:web
+```
+
+The API listens on port `3000` by default. The Vite server proxies API requests
+to it and serves the web interface on `http://127.0.0.1:5173`. Set `PORT` to
+change the API port. `GET /health` returns `{"status":"ok"}` when the process
+is responding.
 
 Run the test suite with:
 
 ```sh
 npm test
+```
+
+Build the production web assets with:
+
+```sh
+npm run build
 ```
 
 ## Create the initial administrator
@@ -71,10 +85,12 @@ in their Compose file.
 
 ## Container
 
-Copy `.env.example` to `.env` and set `ACME_EMAIL` to a valid contact email
-before starting Compose. Public DNS for each domain must point to the VPS, and
+Copy `.env.example` to `.env` and replace its example values. Set `ACME_EMAIL`
+to a valid contact email before starting Compose. Public DNS for each domain
+must point to the VPS, and
 ports 80 and 443 must be reachable from the internet for routing and
-certificate issuance.
+certificate issuance. Set `ADMIN_HOST` to a domain for HTTPS access to the
+manager UI; leave it unset to use an SSH tunnel to the loopback-bound API port.
 
 Build and start the initial service with:
 
@@ -82,8 +98,15 @@ Build and start the initial service with:
 docker compose up --build
 ```
 
-The health endpoint is available at `http://localhost:3000/health`. This
-manager API is bound to the host's loopback interface on port 3000; use an SSH
-tunnel for remote administration until the web UI is available. The SQLite
-database, Traefik certificates, and generated proxy routes are stored in named
-volumes.
+Create an administrator in the Compose database by exporting `ADMIN_USERNAME`
+and `ADMIN_PASSWORD` through a private environment mechanism and running:
+
+```sh
+docker compose run --rm -e ADMIN_USERNAME -e ADMIN_PASSWORD app npm run admin:create
+```
+
+The health endpoint is available at `http://localhost:3000/health`. When
+`ADMIN_HOST` is configured, the manager UI is routed through Traefik with
+HTTPS. Otherwise, use an SSH tunnel to access the loopback-bound API and UI.
+The SQLite database, Traefik certificates, and generated proxy routes are
+stored in named volumes.

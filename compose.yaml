@@ -4,8 +4,10 @@ services:
     restart: unless-stopped
     environment:
       PORT: 3000
+      HOST: 0.0.0.0
       DATABASE_PATH: /app/data/app.sqlite
       TRAEFIK_DYNAMIC_DIRECTORY: /app/proxy-dynamic
+      ADMIN_HOST: ${ADMIN_HOST:-}
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

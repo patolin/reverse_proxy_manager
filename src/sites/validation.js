@@ -3,7 +3,7 @@ import { domainToASCII } from "node:url";
 
 const reservedBackendServices = new Set(["app", "fallback", "traefik"]);
 
-function parseHost(value) {
+export function normalizeHost(value) {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new TypeError("Host must be a domain name or IP address");
   }
@@ -37,7 +37,10 @@ export function parseSiteInput(input) {
     throw new TypeError("Name must be between 1 and 80 characters");
   }
 
-  const host = parseHost(input.host);
+  const host = normalizeHost(input.host);
+  if (process.env.ADMIN_HOST && normalizeHost(process.env.ADMIN_HOST) === host) {
+    throw new TypeError("Host is reserved for the manager");
+  }
   const backendService =
     typeof input.backendService === "string" ? input.backendService.trim().toLowerCase() : "";
   if (

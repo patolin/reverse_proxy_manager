@@ -1,5 +1,7 @@
 import express from "express";
-import { pathToFileURL } from "node:url";
+import helmet from "helmet";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createAuthRouter } from "./auth/routes.js";
 import { createDatabase } from "./db/database.js";
 import { createSitesRouter } from "./sites/routes.js";
@@ -11,13 +13,32 @@ export function createApp({ database, proxyDirectory }) {
 
   const app = express();
 
+  if (process.env.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+  }
   app.disable("x-powered-by");
+  app.use(helmet());
   app.use(express.json({ limit: "16kb" }));
   app.get("/health", (_request, response) => {
     response.json({ status: "ok" });
   });
   app.use("/api/auth", createAuthRouter(database.db));
   app.use("/api/sites", createSitesRouter(database.db, proxyDirectory));
+  app.use("/api", (_request, response) => {
+    response.status(404).json({ error: "API endpoint not found" });
+  });
+  if (process.env.NODE_ENV === "production") {
+    const webDirectory = resolve(dirname(fileURLToPath(import.meta.url)), "../dist");
+    app.use(express.static(webDirectory, { index: false }));
+    app.use((request, response, next) => {
+      if (request.method !== "GET") {
+        return next();
+      }
+      response.sendFile(resolve(webDirectory, "index.html"), (error) => {
+        if (error) next(error);
+      });
+    });
+  }
   app.use((error, _request, response, _next) => {
     if (error?.type === "entity.parse.failed") {
       return response.status(400).json({ error: "Invalid JSON body" });
@@ -41,7 +62,8 @@ export function startServer() {
 
   const database = createDatabase();
   const app = createApp({ database });
-  const server = app.listen(port, "0.0.0.0", () => {
+  const host = process.env.HOST ?? "127.0.0.1";
+  const server = app.listen(port, host, () => {
     console.log(`Reverse proxy manager listening on port ${port}`);
   });
   server.once("close", database.close);

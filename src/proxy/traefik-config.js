@@ -3,8 +3,9 @@ import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { isIP } from "node:net";
 import { stringify } from "yaml";
+import { normalizeHost } from "../sites/validation.js";
 
-function createDynamicConfig(sites) {
+function createDynamicConfig(sites, managerHost) {
   const routers = {};
   const services = {};
   const middlewares = {};
@@ -59,6 +60,51 @@ function createDynamicConfig(sites) {
     }
   }
 
+  if (managerHost) {
+    const host = normalizeHost(managerHost);
+    const hostRule = isIP(host) === 6 ? `[${host}]` : host;
+    services.manager = {
+      loadBalancer: {
+        servers: [{ url: "http://app:3000" }],
+        passHostHeader: true,
+      },
+    };
+
+    if (isIP(host) === 0) {
+      routers["manager-http"] = {
+        rule: `Host(\`${hostRule}\`)`,
+        entryPoints: ["web"],
+        middlewares: ["https-redirect"],
+        service: "manager",
+      };
+      routers["manager-https"] = {
+        rule: `Host(\`${hostRule}\`)`,
+        entryPoints: ["websecure"],
+        middlewares: ["manager-errors"],
+        service: "manager",
+        tls: { certResolver: "letsencrypt" },
+      };
+      middlewares["https-redirect"] = {
+        redirectScheme: { scheme: "https", permanent: true },
+      };
+    } else {
+      routers["manager-http"] = {
+        rule: `Host(\`${hostRule}\`)`,
+        entryPoints: ["web"],
+        middlewares: ["manager-errors"],
+        service: "manager",
+      };
+    }
+
+    middlewares["manager-errors"] = {
+      errors: {
+        status: ["500-599"],
+        service: "static-fallback",
+        query: "/{status}.html",
+      },
+    };
+  }
+
   if (Object.keys(routers).length > 0) {
     services["static-fallback"] = {
       loadBalancer: {
@@ -74,6 +120,7 @@ function createDynamicConfig(sites) {
 export function writeTraefikConfig(
   sites,
   directory = process.env.TRAEFIK_DYNAMIC_DIRECTORY ?? "./data/traefik",
+  managerHost = process.env.ADMIN_HOST,
 ) {
   const resolvedDirectory = resolve(directory);
   mkdirSync(resolvedDirectory, { recursive: true });
@@ -82,7 +129,7 @@ export function writeTraefikConfig(
   const temporaryPath = `${configPath}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
 
   try {
-    writeFileSync(temporaryPath, stringify(createDynamicConfig(sites)), {
+    writeFileSync(temporaryPath, stringify(createDynamicConfig(sites, managerHost)), {
       encoding: "utf8",
       flag: "wx",
       mode: 0o640,

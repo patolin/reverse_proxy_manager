@@ -2,20 +2,24 @@
 
 This document guides implementation of the reverse proxy manager described in
 [`features.md`](./features.md). The repository currently contains the
-specification only; establish the application structure and tooling before
-implementing features.
+initial application foundation, administrator authentication, site management,
+Traefik configuration, and web interface. Continue with the remaining
+deployment workflow and operational hardening.
 
 ## Product and architecture decisions
 
-- Use Node.js and JavaScript for the application, Docker Compose for VPS
-  deployment, and SQLite for the initial database.
-- Use an ORM with migrations to keep schema changes repeatable and make a
-  future database change feasible. Verify database portability rather than
+- Use Node.js ES modules, Express, React with Vite, and Material UI. Docker
+  Compose is the VPS deployment baseline.
+- Use SQLite through Drizzle ORM and checked-in SQL migrations. Keep database
+  operations behind a persistence boundary; verify portability rather than
   assuming it.
-- Prefer Traefik for dynamic container routing and automated Let's Encrypt
-  certificates. Persist its certificate data. Document that public DNS must
-  point to the VPS and the required inbound ports must be reachable.
-- Use a Material Design component library for the frontend.
+- Use Traefik's file provider for generated routes. Write configuration
+  atomically, persist ACME data, and do not give the manager a Docker socket.
+- Route public traffic on standard ports 80/443. Domain names use HTTPS and
+  Let's Encrypt; IP-address routes use HTTP. Public DNS and inbound firewall
+  access are deployment prerequisites.
+- Use a static fallback service for upstream 5xx responses and test the
+  generated Traefik configuration.
 - Treat Docker control as a privileged capability. Do not expose an unrestricted
   Docker socket to the web application. Keep deployment operations in a
   separately constrained worker or API, and permit only validated,
@@ -35,9 +39,9 @@ implementing features.
    - Set limits for permitted repositories, images, commands, networks, and
      resource use.
 2. **Establish the project**
-   - Choose the Node.js server and frontend structure, package manager, code
-     style, linting, and test runners.
-   - Add local development configuration and a Docker Compose baseline.
+   - Maintain the Node.js server, Vite frontend, package manager, code style,
+     and test runner configuration.
+   - Maintain local development setup and Docker Compose deployment.
    - Add configuration validation, database migrations, and operational
      logging.
 3. **Implement authentication and authorization**
@@ -62,8 +66,8 @@ implementing features.
      actionable errors.
    - Protect credentials and avoid exposing deployment secrets in logs.
 7. **Build the Material Design UI**
-   - Implement login, site management, deployment controls, and status/error
-     views.
+   - Maintain login and site management screens; add deployment controls and
+     deployment status/error views as the deployment feature is implemented.
    - Confirm destructive actions and make validation errors accessible.
 8. **Harden, validate, and document operations**
    - Test security boundaries, failure behavior, clean deployment, and
@@ -92,6 +96,8 @@ Docker-operation boundary has been designed and tested.
   committed configuration, client bundles, or logs.
 - Return deliberate HTTP status codes and safe error messages. Log actionable
   server-side context without passwords, tokens, cookies, or other secrets.
+- Preserve secure HTTP headers and only trust the configured reverse-proxy hop
+  when the application is not directly exposed.
 - Use structured logging and avoid logging the full contents of requests or
   deployment environments.
 - Use small, focused modules and descriptive names. Add comments only when they
@@ -117,6 +123,9 @@ Docker-operation boundary has been designed and tested.
   test runs.
 - Run formatting, linting, relevant tests, and a production build before
   considering a change complete. Report any checks that could not be run.
+- Current checks are `npm test`, `npm run build`, and
+  `ACME_EMAIL=admin@example.test docker compose config -q`. Docker image builds
+  additionally require an available Docker daemon.
 - Do not weaken or remove a test just to make a change pass; fix the behavior
   or update the test only when the intended requirement has changed.
 
